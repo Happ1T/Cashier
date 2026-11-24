@@ -1,0 +1,7 @@
+venv/
+.venv/
+__pycache__/
+.pytest_cache/
+server/data.json
+server/data.tmp
+CLAUDE.md

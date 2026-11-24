@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Копилка</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="layout">
+
+    <!-- Левая панель -->
+    <aside class="sidebar">
+      <h1 class="logo">Копилка</h1>
+      <div class="balance-label">Баланс</div>
+      <div class="balance" id="balance">0,00 ₽</div>
+    </aside>
+
+    <!-- Центр: список операций -->
+    <main class="content">
+      <h2>Операции</h2>
+      <div id="operations"></div>
+      <div id="empty" class="empty" hidden>
+        <p>Пока нет операций</p>
+        <button type="button" id="add-first" class="btn">Добавить первую операцию</button>
+      </div>
+      <div id="load-error" class="form-error" hidden></div>
+    </main>
+
+    <!-- Правая панель: форма -->
+    <section class="form-panel">
+      <h2>Новая операция</h2>
+      <form id="op-form" novalidate>
+        <div class="type-switch">
+          <label><input type="radio" name="type" value="expense" checked> Расход</label>
+          <label><input type="radio" name="type" value="income"> Доход</label>
+        </div>
+
+        <div class="field">
+          <label for="amount">Сумма, ₽</label>
+          <input type="text" id="amount" inputmode="decimal" placeholder="Например, 2500,50" autocomplete="off">
+          <div class="field-error" id="amount-error"></div>
+        </div>
+
+        <div class="field">
+          <label for="date">Дата</label>
+          <input type="date" id="date">
+          <div class="field-error" id="date-error"></div>
+        </div>
+
+        <div class="field">
+          <label for="category">Категория</label>
+          <select id="category"></select>
+          <div class="field-error" id="categoryId-error"></div>
+        </div>
+
+        <div class="field">
+          <label for="comment">Комментарий</label>
+          <input type="text" id="comment" maxlength="200" placeholder="Необязательно">
+          <div class="field-error" id="comment-error"></div>
+        </div>
+
+        <div class="form-error" id="form-error"></div>
+        <button type="submit" class="btn btn-wide">Добавить</button>
+      </form>
+    </section>
+
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
