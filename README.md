@@ -62,8 +62,5 @@ tests/test_api.py   — тесты API
 | POST | /api/operations | создать операцию |
 | GET  | /api/balance    | `{"balance": <копейки>}` |
 
-Пример тела POST:
-```json
-{"type": "expense", "amount": "2500,50", "date": "2026-11-24", "categoryId": 5, "comment": "Продукты"}
-```
+
 При ошибке сервер отвечает кодом 400 и `{"error": "сообщение"}`.

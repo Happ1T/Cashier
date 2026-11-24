@@ -30,7 +30,7 @@ class ValidationError(Exception):
 
 
 def parse_amount(value):
-    """Переводит «2500,50» или «2500.50» в копейки (250050). Без float!"""
+    """Ввод и перевод в копейки"""
     if isinstance(value, bool) or value is None:
         raise ValidationError("Введите сумму", "amount")
     text = str(value).strip().replace(" ", "")
@@ -110,7 +110,7 @@ def validate_operation(body, data):
 
 
 def create_app(data_path=DEFAULT_DATA_PATH):
-    """Создаёт приложение. data_path можно подменить в тестах."""
+    """Создаёт приложение"""
     app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="")
     app.json.ensure_ascii = False  # русские буквы в ответах API без с...
     lock = threading.Lock()  # чтобы два запроса не записывали файл одновременно
