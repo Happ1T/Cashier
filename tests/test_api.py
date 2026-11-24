@@ -212,3 +212,284 @@ def test_ids_are_max_plus_one(client):
     """id новых операций выдаются по правилу max(id) + 1: 1, 2, 3..."""
     ids = [add(client, "expense", "1").get_json()["id"] for _ in range(3)]
     assert ids == [1, 2, 3]
+
+
+# ===========================================================================
+# Спринт 2: редактирование и удаление операций, свои категории
+# ===========================================================================
+
+EXPENSE_CAFE = 3   # «Кафе» (расход)
+INCOME_OTHER = 8   # «Прочее» (доход)
+
+
+def read_file(data_path):
+    """Содержимое data.json побайтово — чтобы сравнить «до» и «после»."""
+    with open(data_path, "rb") as f:
+        return f.read()
+
+
+def op_body(type_="expense", amount="100", date="2026-11-24", category=EXPENSE_OTHER, comment=""):
+    """Тело запроса для PUT /api/operations/<id>."""
+    return {"type": type_, "amount": amount, "date": date, "categoryId": category, "comment": comment}
+
+
+def balance(client):
+    return client.get("/api/balance").get_json()["balance"]
+
+
+def find_op(client, op_id):
+    """Операция с данным id из GET /api/operations (или None)."""
+    for op in client.get("/api/operations").get_json():
+        if op["id"] == op_id:
+            return op
+    return None
+
+
+def add_category(client, name, type_="expense", color="#123456"):
+    return client.post("/api/categories", json={"name": name, "type": type_, "color": color})
+
+
+# ---------- US-04: редактирование операции ----------
+
+def test_edit_operation(client):
+    """US-04: меняем сумму, дату, категорию и комментарий одной операции.
+
+    Проверяем: ответ 200, новые значения сохранились, id прежний,
+    баланс пересчитан, а вторая операция осталась точно такой же.
+    """
+    add(client, "income", "10000")                    # id 1
+    add(client, "expense", "500", comment="обед")     # id 2
+    other_before = find_op(client, 1)
+    assert balance(client) == 1000000 - 50000
+
+    r = client.put(
+        "/api/operations/2",
+        json=op_body(amount="2500,50", date="2026-11-20", category=EXPENSE_CAFE, comment="ужин"),
+    )
+    assert r.status_code == 200
+    edited = r.get_json()
+    assert edited["id"] == 2
+    assert edited["amount"] == 250050
+    assert edited["date"] == "2026-11-20"
+    assert edited["categoryId"] == EXPENSE_CAFE
+    assert edited["comment"] == "ужин"
+
+    assert balance(client) == 1000000 - 250050
+    assert find_op(client, 1) == other_before  # другая операция не изменилась
+
+
+def test_edit_operation_change_type(client):
+    """US-04: расход можно превратить в доход (с категорией дохода) —
+    в балансе операция теперь идёт с плюсом."""
+    add(client, "expense", "100")  # id 1, баланс −100 ₽
+    r = client.put("/api/operations/1", json=op_body(type_="income", category=INCOME_OTHER))
+    assert r.status_code == 200
+    assert balance(client) == 10000
+
+
+def test_edit_persists_after_restart(data_path):
+    """US-04: изменения видны после «перезапуска» сервера."""
+    client1 = create_app(data_path).test_client()
+    add(client1, "expense", "100")
+    client1.put("/api/operations/1", json=op_body(amount="777"))
+    client2 = create_app(data_path).test_client()
+    assert find_op(client2, 1)["amount"] == 77700
+
+
+@pytest.mark.parametrize("bad", ["0", "-5", "абв", "1.555", "", None])
+def test_edit_bad_amount_rejected(client, data_path, bad):
+    """US-04: те же правила суммы, что в US-01. Ошибка → 400, файл не изменился."""
+    add(client, "expense", "100")
+    before = read_file(data_path)
+    r = client.put("/api/operations/1", json=op_body(amount=bad))
+    assert r.status_code == 400
+    assert r.get_json()["error"]
+    assert read_file(data_path) == before
+
+
+def test_edit_wrong_category_type_rejected(client, data_path):
+    """US-04: сменили тип на «доход», а категорию оставили от расхода → 400."""
+    add(client, "expense", "100")
+    before = read_file(data_path)
+    r = client.put("/api/operations/1", json=op_body(type_="income", category=EXPENSE_OTHER))
+    assert r.status_code == 400
+    assert read_file(data_path) == before
+
+
+def test_edit_missing_operation_404(client, data_path):
+    """Редактирование несуществующей операции → 404, файл не изменился."""
+    before = read_file(data_path)
+    r = client.put("/api/operations/999", json=op_body())
+    assert r.status_code == 404
+    assert r.get_json()["error"]
+    assert read_file(data_path) == before
+
+
+# ---------- US-05: удаление операции ----------
+
+def test_delete_operation(client):
+    """US-05: операция исчезает из списка, баланс пересчитывается."""
+    add(client, "income", "1000")  # id 1
+    add(client, "expense", "300")  # id 2
+    r = client.delete("/api/operations/2")
+    assert r.status_code == 200
+    ops = client.get("/api/operations").get_json()
+    assert [op["id"] for op in ops] == [1]
+    assert balance(client) == 100000
+
+
+def test_delete_missing_operation_404(client, data_path):
+    """US-05: удаление несуществующей операции → 404, файл не изменился."""
+    add(client, "expense", "100")
+    before = read_file(data_path)
+    r = client.delete("/api/operations/999")
+    assert r.status_code == 404
+    assert r.get_json()["error"]
+    assert read_file(data_path) == before
+
+
+def test_bad_id_in_url_gives_json_404(client):
+    """id не число (/api/operations/abc) → ошибка в виде JSON, а не HTML.
+    Код 404 или 405 (405 — из-за того, что статика отдаётся из корня сайта)."""
+    for r in (client.delete("/api/operations/abc"), client.put("/api/operations/abc", json={})):
+        assert r.status_code in (404, 405)
+        assert r.get_json()["error"]
+
+
+# ---------- US-06: свои категории ----------
+
+def test_create_category(client):
+    """US-06: новая категория создаётся (201), пробелы по краям названия убираются,
+    id = max + 1, и она появляется в GET /api/categories."""
+    r = add_category(client, "  Подарки  ", color="#AABBCC")
+    assert r.status_code == 201
+    cat = r.get_json()
+    assert cat == {"id": 9, "name": "Подарки", "type": "expense", "color": "#aabbcc"}
+    assert cat in client.get("/api/categories").get_json()
+
+
+def test_new_category_usable_for_operation(client):
+    """US-06: в новую категорию сразу можно добавить операцию."""
+    cat_id = add_category(client, "Подарки").get_json()["id"]
+    assert add(client, "expense", "100", category=cat_id).status_code == 201
+
+
+def test_duplicate_category_409(client, data_path):
+    """US-06: «кафе» при существующей «Кафе» (тот же тип) → 409, файл не изменился."""
+    before = read_file(data_path)
+    r = add_category(client, "кафе")
+    assert r.status_code == 409
+    assert r.get_json()["error"] == "Такая категория уже есть"
+    assert read_file(data_path) == before
+
+
+def test_same_name_other_type_allowed(client):
+    """Дубль считается только внутри одного типа: доход «Кафе» создать можно."""
+    assert add_category(client, "Кафе", type_="income").status_code == 201
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"name": "", "type": "expense", "color": "#123456"},          # пустое имя
+        {"name": "   ", "type": "expense", "color": "#123456"},       # только пробелы
+        {"name": "я" * 31, "type": "expense", "color": "#123456"},    # длиннее 30
+        {"name": "Подарки", "type": "gift", "color": "#123456"},      # неизвестный тип
+        {"name": "Подарки", "type": "expense", "color": "red"},       # не #rrggbb
+        {"name": "Подарки", "type": "expense"},                       # нет цвета
+    ],
+)
+def test_bad_category_rejected(client, data_path, body):
+    """US-06: неправильные данные категории → 400, файл не изменился."""
+    before = read_file(data_path)
+    r = client.post("/api/categories", json=body)
+    assert r.status_code == 400
+    assert r.get_json()["error"]
+    assert read_file(data_path) == before
+
+
+def test_category_name_30_chars_ok(client):
+    """Ровно 30 символов — ещё можно."""
+    assert add_category(client, "я" * 30).status_code == 201
+
+
+def test_rename_category(client):
+    """US-06: переименование и смена цвета; тип не меняется.
+    Операции ссылаются на категорию по id, поэтому новое имя «видят» сразу."""
+    add(client, "expense", "100", category=EXPENSE_CAFE)
+    r = client.put(f"/api/categories/{EXPENSE_CAFE}", json={"name": "Рестораны", "color": "#000000"})
+    assert r.status_code == 200
+    renamed = {"id": 3, "name": "Рестораны", "type": "expense", "color": "#000000"}
+    assert r.get_json() == renamed
+    assert renamed in client.get("/api/categories").get_json()
+    assert find_op(client, 1)["categoryId"] == EXPENSE_CAFE
+
+
+def test_rename_category_change_case_of_itself(client):
+    """«Кафе» → «КАФЕ» — это не дубль: категория не сравнивается сама с собой."""
+    r = client.put(f"/api/categories/{EXPENSE_CAFE}", json={"name": "КАФЕ", "color": "#9b59b6"})
+    assert r.status_code == 200
+
+
+def test_rename_category_to_duplicate_409(client, data_path):
+    """US-06: переименовать «Кафе» в «продукты» нельзя — такая уже есть."""
+    before = read_file(data_path)
+    r = client.put(f"/api/categories/{EXPENSE_CAFE}", json={"name": "продукты", "color": "#9b59b6"})
+    assert r.status_code == 409
+    assert read_file(data_path) == before
+
+
+def test_rename_other_forbidden_but_color_ok(client, data_path):
+    """«Прочее» нельзя переименовать (409), но цвет сменить можно."""
+    before = read_file(data_path)
+    r = client.put(f"/api/categories/{EXPENSE_OTHER}", json={"name": "Разное", "color": "#7f8c8d"})
+    assert r.status_code == 409
+    assert read_file(data_path) == before
+
+    r = client.put(f"/api/categories/{EXPENSE_OTHER}", json={"name": "Прочее", "color": "#000000"})
+    assert r.status_code == 200
+    assert r.get_json()["color"] == "#000000"
+
+
+def test_rename_missing_category_404(client, data_path):
+    """Переименование несуществующей категории → 404, файл не изменился."""
+    before = read_file(data_path)
+    r = client.put("/api/categories/999", json={"name": "X", "color": "#000000"})
+    assert r.status_code == 404
+    assert read_file(data_path) == before
+
+
+def test_delete_empty_category(client):
+    """US-06: категорию без операций можно удалить."""
+    cat_id = add_category(client, "Подарки").get_json()["id"]
+    r = client.delete(f"/api/categories/{cat_id}")
+    assert r.status_code == 200
+    ids = [c["id"] for c in client.get("/api/categories").get_json()]
+    assert cat_id not in ids
+
+
+def test_delete_category_with_operations_409(client, data_path):
+    """US-06: категорию с операциями удалить нельзя → 409, файл не изменился."""
+    add(client, "expense", "100", category=EXPENSE_CAFE)
+    before = read_file(data_path)
+    r = client.delete(f"/api/categories/{EXPENSE_CAFE}")
+    assert r.status_code == 409
+    assert r.get_json()["error"] == "В категории есть операции — удалить нельзя"
+    assert read_file(data_path) == before
+
+
+@pytest.mark.parametrize("cat_id", [EXPENSE_OTHER, INCOME_OTHER])
+def test_delete_other_forbidden(client, data_path, cat_id):
+    """US-06: «Прочее» (и расходов, и доходов) удалить нельзя никогда — даже пустую."""
+    before = read_file(data_path)
+    r = client.delete(f"/api/categories/{cat_id}")
+    assert r.status_code == 409
+    assert read_file(data_path) == before
+
+
+def test_delete_missing_category_404(client, data_path):
+    """Удаление несуществующей категории → 404, файл не изменился."""
+    before = read_file(data_path)
+    r = client.delete("/api/categories/999")
+    assert r.status_code == 404
+    assert read_file(data_path) == before

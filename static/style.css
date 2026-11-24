@@ -21,7 +21,7 @@ h2 {
 /* Три колонки: узкая панель, список, форма */
 .layout {
   display: grid;
-  grid-template-columns: 240px 1fr 360px;
+  grid-template-columns: 280px 1fr 360px;
   min-height: 100vh;
 }
 
@@ -205,5 +205,204 @@ h2 {
 
 .btn-wide {
   width: 100%;
+  margin-top: 8px;
+}
+
+/* ---------- Спринт 2 ---------- */
+
+/* Кнопки формы операции: «Добавить/Сохранить» и «Отмена» в одну строку */
+.form-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.form-buttons .btn {
+  flex: 1;
+}
+
+.btn-secondary {
+  background: #e8eaed;
+  color: #222;
+}
+
+.btn-secondary:hover {
+  background: #dadce0;
+}
+
+.btn-danger {
+  background: #d93025;
+}
+
+.btn-danger:hover {
+  background: #b3261e;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+/* Строка операции: кликабельна, выбранная подсвечена */
+.op {
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.op:hover {
+  border-color: #d2e3fc;
+}
+
+.op.selected {
+  border-color: #1a73e8;
+}
+
+/* Корзина: появляется только при наведении на строку */
+.op-delete {
+  visibility: hidden;
+  background: none;
+  border: none;
+  font-size: 16px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.op:hover .op-delete,
+.op-delete:focus-visible {
+  visibility: visible;
+}
+
+.op-delete:hover {
+  background: #fdecea;
+}
+
+#list-error {
+  margin-bottom: 12px;
+}
+
+/* Окно подтверждения */
+.dialog {
+  border: none;
+  border-radius: 10px;
+  padding: 24px;
+  max-width: 420px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.dialog p {
+  margin: 0 0 20px;
+  font-size: 16px;
+}
+
+.dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Категории в левой панели */
+.categories {
+  margin-top: 32px;
+}
+
+.side-title {
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.cat-group-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin: 12px 0 4px;
+}
+
+.cat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Длинное название (до 30 символов) обрезаем многоточием */
+.cat-item span:last-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cat-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cat-item.selected {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.cat-form {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.cat-form-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.cat-form input[type="text"],
+.cat-form select {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 14px;
+  font-family: inherit;
+  border: 1px solid #ccd0d5;
+  border-radius: 6px;
+}
+
+.cat-form input.invalid {
+  border-color: #d93025;
+  background: #fdecea;
+}
+
+.cat-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cat-form input[type="color"] {
+  width: 44px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid #ccd0d5;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cat-error {
+  color: #ffb4ab;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.cat-buttons {
+  display: flex;
+  gap: 6px;
   margin-top: 8px;
 }

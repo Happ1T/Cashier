@@ -11,14 +11,14 @@
 ```powershell
 python -m venv venv
 venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r readable/requirements.txt
 ```
 
 **macOS / Linux:**
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r readable/requirements.txt
 ```
 
 > Если PowerShell пишет, что запуск скриптов запрещён, выполните один раз:
@@ -60,7 +60,19 @@ tests/test_api.py   — тесты API
 | GET  | /api/categories | список категорий |
 | GET  | /api/operations | список операций (новые сверху) |
 | POST | /api/operations | создать операцию |
+| PUT  | /api/operations/&lt;id&gt; | изменить операцию |
+| DELETE | /api/operations/&lt;id&gt; | удалить операцию |
 | GET  | /api/balance    | `{"balance": <копейки>}` |
+| POST | /api/categories | создать категорию (`name`, `type`, `color`) |
+| PUT  | /api/categories/&lt;id&gt; | переименовать / сменить цвет (`name`, `color`) |
+| DELETE | /api/categories/&lt;id&gt; | удалить категорию без операций |
 
+Суммы передаются строкой («2500,50»), хранятся в целых копейках.
 
-При ошибке сервер отвечает кодом 400 и `{"error": "сообщение"}`.
+При ошибке сервер отвечает `{"error": "сообщение"}` и кодом:
+
+| Код | Когда |
+|---|---|
+| 400 | неверные данные (сумма, дата, название, цвет…) |
+| 404 | записи с таким id нет |
+| 409 | конфликт: такая категория уже есть, в категории есть операции, попытка удалить или переименовать «Прочее» |
